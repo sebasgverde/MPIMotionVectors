@@ -1,103 +1,139 @@
+/*
+ *  mpi-example2.c
+ *
+ *
+ *  Created by Edwin Montoya on 10/16/10.
+ *  Copyright 2010 __MyCompanyName__. All rights reserved.
+ *
+ */
 
-#include <stdio.h>
-#include <sys/time.h>
+ #include <stdio.h>
+ #include <math.h>
 
-#define TAMANIO 1024
+#include "mpi.h"
 
-int p[TAMANIO];// = {'a','b','c'};
-int d[TAMANIO];//= {'3','4','d','e','f','s','b','3','a','5','6'};
+#define MASTER 0
+#define FROM_MASTER 1
+#define FROM_WORKER 2
 
-double t0, t1, t2;
+ #define F_x 640
+ #define F_y 480
 
-int leerArchivos(int arre[], char* archivo)
-{
-	FILE *file = fopen(archivo, "r");
+ int vec_sum[F_x];
+ int Fi[F_x][F_y];
+ int Fj[F_x][F_y];
 
-	int i=0;
-	char num;
-	while(fscanf(file, "%c", &num) > 0) {
-	    arre[i] = num;
-	    i++;
-	}
-	fclose(file);
-	return i;
+int     taskId,
+        numTasks,
+        numWorkers,
+        sourceId,
+        destId,
+        currentWorker=0;
+
+ MPI_Status status;
+
+void initMPI(int argc, char **argv) {
+        MPI_Init(&argc, &argv);
+        MPI_Comm_rank(MPI_COMM_WORLD, &taskId);
+        MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
+        numWorkers = numTasks-1;
+}
+void sendRows() {
+  int count = F_x;
+  int index;
+  int i;
+  int w;
+  for (i=0;i<F_x;i++) {
+        w = nextWorker();
+        //printf("Send-index=%d a %d\n",i,w);
+    MPI_Send(&i, 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
+    MPI_Send(&Fj[i][0], count, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
+  }
+  //printf("finalizando...\n");
+  int fin=-1;
+  for (i=1;i<=numWorkers;i++) {
+    w = nextWorker();
+        MPI_Send(&fin, 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
+        //printf("finalizando el worker %d\n", w);
+  }
 }
 
-int valorAbs(int a)
-{
-	if(a < 0)
-		return a * -1;
-	else
-		return a;
+void recvRows() {
+  int count = F_x;
+  int index = 0;
+  int result;
+  while (index != -1) {
+        MPI_Recv(&index, 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD,&status);
+        if (index != -1) {
+                MPI_Recv(&Fi[index][0], count, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD,&status);
+                result = processRow(index);
+                MPI_Send(&index, 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD);
+                MPI_Send(&result, 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD);
+                //printf("recvRows(task=%d) index=%d result=%d\n", taskId,index,result);
+        }
+  }
+}
+int processRow(int index) {
+        int i;
+        int result = 0;
+        for (i=0;i<F_x;i++)
+                result = result + Fi[index][i];
+        return result;
 }
 
-
-//calcula la similitud de 2 vectores por suma de diferencias
-double similitud(int parte[], int dest[], int tamParte)
-{
-	/*ascii maximo menos ascii minimo por el numero de partes, esta
-	seria la maxima diferencia, es decir, 1*/
-	double constanteMaximaAscii = (126-32)*tamParte;
-
-	int acum = 0, i;
-	for(i = 0; i < tamParte; i++)
-	{
-		int o = parte[i] - dest[i];
-		acum += valorAbs(parte[i] - dest[i]);
-	}
-
-	return (acum/constanteMaximaAscii);//por regla de 3
+int DoSequencial() {
+        int i;
+		for (i=0;i<F_x;i++) {
+                vec_sum[i] = processRow(i);
+        }
 }
 
-void vectorMov()
-{
-	//clock_t start, startt1, end, endt1;
-	double temp;
-	int ind = -1;
-	double match = 100;
-	
-	struct timeval startt1 ; gettimeofday(&startt1, NULL);
-	int m = leerArchivos(p, "p.txt");
-	int n = leerArchivos(d, "d.txt");
-	struct timeval endt1 ; gettimeofday(&endt1, NULL);
-  	t1 = (double)(endt1.tv_usec - startt1.tv_usec)*1000;
-
-
-	//int n = 38;//sizeof((int) * d);
-	//int m = 5;//sizeof((int) * p);
-	int i;
-	for(i = 0; i < n-m; i++)
-	{
-		struct timeval start ;gettimeofday(&start, NULL);
-		temp = similitud(p, d+i, m);
-		struct timeval end; gettimeofday(&end, NULL);		
-		t0= (double)(end.tv_usec - start.tv_usec)*1000.0;
-
-		if(temp == 0)
-		{
-			printf("%i %d\n", i, 0);
-			return;
-		}
-		else if (temp < match)
-		{
-			ind = i;
-			match = temp;
-		}
-	}
-	printf("%i %f \n", ind, match);
-	return;
+int nextWorker() {
+        if (currentWorker >= numWorkers)
+                currentWorker = 0;
+        currentWorker++;
+        return currentWorker;
 }
 
-void main()
-{
-	//clock_t startt2, endt2;
-
-	struct timeval startt2 ; gettimeofday(&startt2, NULL);
-	vectorMov();
-	struct timeval endt2 ; gettimeofday(&endt2, NULL);
-    t2 = (double)(endt2.tv_usec - startt2.tv_usec)*1000.0;
-
-    printf("t0 = %ld\n", t0);
-	printf("t1 = %d\n", t1);
-    printf("t2 = %d\n", t2);
+void recvResults() {
+  int count = F_x;
+  int i, index,w;
+  currentWorker=0;
+  for (i=0;i<F_x;i++) {
+        w = nextWorker();
+        //printf("recvResults(%d) waiting data from %d\n", taskId,w);
+    MPI_Recv(&index, 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD, &status);
+        if (index != -1) {
+                MPI_Recv(&vec_sum[index], 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD,&status);
+                printf("recvResults(%d) index=%d row-sum=%d\n", taskId,index,vec_sum[index]);
+        }
+  }
 }
+void fillMatrix() {
+        int i,j;
+        int val_i, val_j;
+        int prob;
+        for (i=0;i<F_x;i++)
+                for (j=0;j<F_y;j++) {
+                        val_i = rand()%256;
+                        val_j = rand()%256;
+                        Fi[i][j] = val_i;
+                        Fj[i][j] = val_j;
+                }
+ }
+ double start;
+ void main(int argc, char **argv) {
+        initMPI(argc, argv);
+		DoSequencial();
+		/*
+        start = MPI_Wtime();
+        if (taskId == MASTER) {
+                fillMatrix();
+                sendRows();
+                recvResults();
+                printf("Processing time: %lf\n", MPI_Wtime()-start);
+        } else {
+                recvRows();
+        }*/
+        MPI_Finalize();
+ }
