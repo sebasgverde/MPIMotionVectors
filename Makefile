@@ -5,7 +5,7 @@ vectoresMov: vectoresMov.c
 	mpicc $< -o $@
 	
 run:
-	mpirun -np 4 vectoresMov
+	mpirun -np 1 vectoresMov
 
 clean:
 	rm  -f vectoresMov.o vectoresMov

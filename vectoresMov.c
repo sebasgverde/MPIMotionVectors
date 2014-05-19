@@ -16,12 +16,15 @@
 #define FROM_MASTER 1
 #define FROM_WORKER 2
 
+#define TAMANIO 20
+#define TAMMACROBLOQUE 5
+
  #define F_x 640
  #define F_y 480
 
  int vec_sum[F_x];
- int Fi[F_x][F_y];
- int Fj[F_x][F_y];
+ int Fi[TAMANIO];
+ int Fj[TAMANIO];
 
 int     taskId,
         numTasks,
@@ -47,7 +50,7 @@ void sendRows() {
         w = nextWorker();
         //printf("Send-index=%d a %d\n",i,w);
     MPI_Send(&i, 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
-    MPI_Send(&Fj[i][0], count, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
+    MPI_Send(&Fj[i]/*[0]*/, count, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
   }
   //printf("finalizando...\n");
   int fin=-1;
@@ -65,7 +68,7 @@ void recvRows() {
   while (index != -1) {
         MPI_Recv(&index, 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD,&status);
         if (index != -1) {
-                MPI_Recv(&Fi[index][0], count, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD,&status);
+                MPI_Recv(&Fi[index]/*[0]*/, count, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD,&status);
                 result = processRow(index);
                 MPI_Send(&index, 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD);
                 MPI_Send(&result, 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD);
@@ -77,13 +80,13 @@ int processRow(int index) {
         int i;
         int result = 0;
         for (i=0;i<F_x;i++)
-                result = result + Fi[index][i];
+                result = result + Fi[index]/*[i]*/;
         return result;
 }
 
 int DoSequencial() {
         int i;
-		for (i=0;i<F_x;i++) {
+		for (i=0;i<TAMANIO;i++) {
                 vec_sum[i] = processRow(i);
         }
 }
@@ -110,21 +113,30 @@ void recvResults() {
   }
 }
 void fillMatrix() {
-        int i,j;
+        int j;
         int val_i, val_j;
-        int prob;
-        for (i=0;i<F_x;i++)
-                for (j=0;j<F_y;j++) {
-                        val_i = rand()%256;
-                        val_j = rand()%256;
-                        Fi[i][j] = val_i;
-                        Fj[i][j] = val_j;
-                }
+		for (j=0;j<TAMANIO;j++) {
+				//val_i = rand()%256;
+				val_j = rand()%256;
+				Fi[j] = val_j;
+				Fj[j] = val_j;
+		}
  }
+ 
+ void imprimirMatrices()
+ {
+	int j;
+	for (j=0;j<TAMANIO;j++) {
+		printf("%d %d\n", Fi[j], Fj[j]);
+	}
+ }
+ 
  double start;
  void main(int argc, char **argv) {
         initMPI(argc, argv);
-		DoSequencial();
+		
+		fillMatrix();
+		imprimirMatrices();
 		/*
         start = MPI_Wtime();
         if (taskId == MASTER) {

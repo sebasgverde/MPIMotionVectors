@@ -7,6 +7,7 @@
 #define FROM_WORKER 2
 
 #define TAMANIO 20
+#define TAMMACROBLOQUE 5
 
 int p[TAMANIO];// = {'a','b','c'};
 int d[TAMANIO];//= {'3','4','d','e','f','s','b','3','a','5','6'};
