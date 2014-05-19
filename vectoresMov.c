@@ -42,56 +42,6 @@ void initMPI(int argc, char **argv) {
         MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
         numWorkers = numTasks-1;
 }
-void sendRows() {
-  int count = F_x;
-  int index;
-  int i;
-  int w;
-  for (i=0;i<F_x;i++) {
-        w = nextWorker();
-        //printf("Send-index=%d a %d\n",i,w);
-    MPI_Send(&i, 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
-    MPI_Send(&Fj[i]/*[0]*/, count, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
-  }
-  //printf("finalizando...\n");
-  int fin=-1;
-  for (i=1;i<=numWorkers;i++) {
-    w = nextWorker();
-        MPI_Send(&fin, 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
-        //printf("finalizando el worker %d\n", w);
-  }
-}
-
-void recvRows() {
-  int count = F_x;
-  int index = 0;
-  int result;
-  while (index != -1) {
-        MPI_Recv(&index, 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD,&status);
-        if (index != -1) {
-                MPI_Recv(&Fi[index]/*[0]*/, count, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD,&status);
-                result = processRow(index);
-                MPI_Send(&index, 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD);
-                MPI_Send(&result, 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD);
-                //printf("recvRows(task=%d) index=%d result=%d\n", taskId,index,result);
-        }
-  }
-}
-int processRow(int index) {
-        int i;
-        int result = 0;
-        for (i=0;i<F_x;i++)
-                result = result + Fi[index]/*[i]*/;
-        return result;
-}
-
-
-
-
-
-
-//--------------------------------------------------------------------------
-
 int valorAbs(int a)
 {
 	if(a < 0)
@@ -117,8 +67,88 @@ double similitud(int parte[], int dest[], int tamParte)
 }
 
 
+int processRow(int index)
+{
+	//clock_t start, startt1, end, endt1;	
+	int m = TAMMACROBLOQUE;//leerArchivos(p, "p.txt");
+	int n = TAMANIO;//leerArchivos(d, "d.txt");
 
+	int i;
+	
+	double temp;
+	int ind = -1;
+	double match = 100;
+		
+	for(i = 0; i < n-m; i++)
+	{		
+		temp = similitud(Fi+index, Fj+i, m);		
 
+		if(temp == 0)
+		{
+			ind = i;
+			match = 0;
+			referencia[i][0] = (double)ind;
+			referencia[i][1] = (double)match;
+			return;
+		}
+		else if (temp < match)
+		{
+			ind = i;
+			match = temp;
+		}
+			
+		printf("%i %i %f \n",i, ind, match);
+		referencia[i][0] = (double)ind;
+		referencia[i][1] = (double)match;
+	}
+}
+void sendRows() {
+  int count = TAMANIO;
+  int index;
+  int i;
+  int w;
+  //mando todo el destino a cada trabajador
+  for(i=0; i < numWorkers; i++)
+  {
+	w = nextWorker();
+	MPI_Send(&Fj[0], count, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
+  }
+  //empiezo a rotar los patrones con sus indices
+  count = TAMMACROBLOQUE;
+  for (i=0;i<TAMANIO-TAMMACROBLOQUE;i++) {
+    w = nextWorker();
+        //printf("Send-index=%d a %d\n",i,w);
+    MPI_Send(&i, 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
+    MPI_Send(&Fi[i]/*[0]*/, count, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
+  }
+  //printf("finalizando...\n");
+  int fin=-1;
+  for (i=1;i<=numWorkers;i++) {
+    w = nextWorker();
+        MPI_Send(&fin, 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
+        //printf("finalizando el worker %d\n", w);
+  }
+}
+
+void recvRows() {
+  int count = TAMANIO;
+  int index = 0;
+  int result;
+  
+  MPI_Recv(&Fj[0], count, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD,&status);
+  while (index != -1) {
+        MPI_Recv(&index, 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD,&status);
+		count = TAMMACROBLOQUE;
+        if (index != -1) {
+                MPI_Recv(&Fi[index], count, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD,&status);
+                processRow(index);
+                MPI_Send(&index, 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD);
+                MPI_Send(&referencia[index][0], 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD);
+				MPI_Send(&referencia[index][1], 1, MPI_DOUBLE, MASTER, FROM_MASTER, MPI_COMM_WORLD);
+                //printf("recvRows(task=%d) index=%d result=%d\n", taskId,index,result);
+        }
+  }
+}
 
 void DoSequencial()
 {
@@ -168,13 +198,14 @@ void recvResults() {
   int count = F_x;
   int i, index,w;
   currentWorker=0;
-  for (i=0;i<F_x;i++) {
+  for (i=0;i<TAMANIO-TAMMACROBLOQUE;i++) {
         w = nextWorker();
         //printf("recvResults(%d) waiting data from %d\n", taskId,w);
     MPI_Recv(&index, 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD, &status);
         if (index != -1) {
-                MPI_Recv(&vec_sum[index], 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD,&status);
-                printf("recvResults(%d) index=%d row-sum=%d\n", taskId,index,vec_sum[index]);
+                MPI_Recv(&referencia[index][0], 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD,&status);
+				MPI_Recv(&referencia[index][1], 1, MPI_DOUBLE, w, FROM_MASTER, MPI_COMM_WORLD,&status);
+              //  printf("recvResults(%d) index=%d row-sum=%d\n", taskId,index,vec_sum[index]);
         }
   }
 }
@@ -211,10 +242,10 @@ void fillMatrix() {
 		
 		fillMatrix();
 		imprimirMatrices();
-		DoSequencial();
-		imprimirReferencias();
+		/*DoSequencial();
+		imprimirReferencias();*/
 		
-		/*
+		
         start = MPI_Wtime();
         if (taskId == MASTER) {
                 fillMatrix();
@@ -223,6 +254,6 @@ void fillMatrix() {
                 printf("Processing time: %lf\n", MPI_Wtime()-start);
         } else {
                 recvRows();
-        }*/
+        }
         MPI_Finalize();
  }
