@@ -25,6 +25,7 @@
  int vec_sum[F_x];
  int Fi[TAMANIO];
  int Fj[TAMANIO];
+ double referencia[TAMANIO - TAMMACROBLOQUE][2];
 
 int     taskId,
         numTasks,
@@ -84,11 +85,76 @@ int processRow(int index) {
         return result;
 }
 
-int DoSequencial() {
-        int i;
-		for (i=0;i<TAMANIO;i++) {
-                vec_sum[i] = processRow(i);
-        }
+
+
+
+
+
+//--------------------------------------------------------------------------
+
+int valorAbs(int a)
+{
+	if(a < 0)
+		return a * -1;
+	else
+		return a;
+}
+
+double similitud(int parte[], int dest[], int tamParte)
+{
+	/*ascii maximo menos ascii minimo por el numero de partes, esta
+	seria la maxima diferencia, es decir, 1*/
+	double constanteMaximaAscii = (255-0)*tamParte;
+
+	int acum = 0, i;
+	for(i = 0; i < tamParte; i++)
+	{
+		int o = parte[i] - dest[i];
+		acum += valorAbs(parte[i] - dest[i]);
+	}
+
+	return (acum/constanteMaximaAscii);//por regla de 3
+}
+
+
+
+
+
+void DoSequencial()
+{
+	//clock_t start, startt1, end, endt1;	
+	int m = TAMMACROBLOQUE;//leerArchivos(p, "p.txt");
+	int n = TAMANIO;//leerArchivos(d, "d.txt");
+
+	int i, j;
+	for(i = 0; i < n-m; i++)
+	{
+		double temp;
+		int ind = -1;
+		double match = 100;
+		int band = 1;
+	
+		for(j = 0; j < n-m && band == 1; j++)
+		{
+			temp = similitud(Fi+i, Fj+j, m);		
+
+			if(temp == 0)
+			{
+				ind = i;
+				match = temp;
+				band = 0;
+			}
+			else if (temp < match)
+			{
+				ind = i;
+				match = temp;
+			}
+		}
+		printf("%i %i %f \n",i, ind, match);
+		referencia[i][0] = (double)ind;
+		referencia[i][1] = (double)match;
+	}
+	return;
 }
 
 int nextWorker() {
@@ -119,7 +185,7 @@ void fillMatrix() {
 				//val_i = rand()%256;
 				val_j = rand()%256;
 				Fi[j] = val_j;
-				Fj[j] = val_j;
+				Fj[j] = val_j + rand()%50;
 		}
  }
  
@@ -131,12 +197,23 @@ void fillMatrix() {
 	}
  }
  
+ void imprimirReferencias()
+ {
+	int j;
+ 	for (j=0;j<TAMANIO-TAMMACROBLOQUE;j++) {
+		printf("%f %f\n", referencia[j][0], referencia[j][1]);
+	}
+ }
+ 
  double start;
  void main(int argc, char **argv) {
         initMPI(argc, argv);
 		
 		fillMatrix();
 		imprimirMatrices();
+		DoSequencial();
+		imprimirReferencias();
+		
 		/*
         start = MPI_Wtime();
         if (taskId == MASTER) {
