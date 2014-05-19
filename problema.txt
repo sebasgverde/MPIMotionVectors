@@ -1,0 +1,21 @@
+Realizar un programa en C, en Linux, en la maquina de sistemas.eafit.edu.co (ya saben como entrar), para el miercoles próximo. programa serial o secuencial con las siguientes especificaciones:
+
+datos de entrada:
+
+D[n] -> de un archivo texto (d.txt)
+
+P[m] -> de un archivo texto (p.txt)
+
+datos de salida (salida estandar):
+
+i, best_match, t0 y t1y t2
+
+i = posición en D[n], donde mejor match encontro el patrón P[m]
+
+best_match = valor de la función de similitud (0 -> totalmente igual, 1 -> totalmente diferente, entre 0 y 1, valor de similitud.)
+
+t0 tiempo de ejecución de la función de similitud
+
+t1+t2 tiempo de ejecución de todo el programa (SEPARE ENTRE TIEMPO DE CARGA DE LOS DATOS - leyendo el archivo d.txt y p.txt- t1, y el tiempo real de procesamiento, t2). Es muy importante el tiempo t1
+
+Como función de similitud, pueden emplear la sumatoria de diferencias en valor absoluto.
