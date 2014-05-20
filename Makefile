@@ -1,5 +1,5 @@
 
-all: vectoresMov
+all: vectoresMov run
 
 vectoresMov: vectoresMov.c
 	mpicc $< -o $@
