@@ -16,8 +16,8 @@
 #define FROM_MASTER 1
 #define FROM_WORKER 2
 
-#define TAMANIO 8
-#define TAMMACROBLOQUE 4
+#define TAMANIO 10000
+#define TAMMACROBLOQUE 100
 
  #define F_x 640
  #define F_y 480
@@ -81,13 +81,14 @@ int processRow(int index)
 		
 	for(i = 0; i < n-m; i++)
 	{		
-		temp = similitud(Fi+index, Fj+i, m);		
+		temp = similitud(Fi+index, Fj+i, m);
+		//printf("%i %i %f \n",index, i, temp);
 
 		if(temp == 0)
 		{
 			ind = i;
 			match = 0;
-			printf("%i %i %f \n",index, ind, match);
+			//printf("%i %i %f \n",index, ind, match);
 			referencia[index][0] = (double)ind;
 			referencia[index][1] = (double)match;
 			return;
@@ -98,7 +99,7 @@ int processRow(int index)
 			match = temp;
 		}
 	}
-	printf("%i %i %f \n",index, ind, match);
+	//printf("%i %i %f \n",index, ind, match);
 	referencia[index][0] = (double)ind;
 	referencia[index][1] = (double)match;
 }
@@ -120,7 +121,7 @@ void sendRows() {
   for (i=0;i<TAMANIO-TAMMACROBLOQUE;i++) {
     w = nextWorker();
     MPI_Send(&i, 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
-	        printf("Send-index=%d a %d\n",i,w);
+	        //printf("Send-index=%d a %d\n",i,w);
     MPI_Send(&Fi[i]/*[0]*/, count, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD);
   }
   //printf("finalizando...\n");
@@ -144,13 +145,13 @@ void recvRows() {
 		count = TAMMACROBLOQUE;
         if (index != -1) {
                 MPI_Recv(&Fi[index], count, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD,&status);
-				printf("recivido indice %d en %d\n", index, taskId);
+				//printf("recivido indice %d en %d\n", index, taskId);
                 processRow(index);
-				printf("termino procesamiento en %d\n", taskId);
+				//printf("termino procesamiento en %d\n", taskId);
                 MPI_Send(&index, 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD);
-                MPI_Send(&referencia[index][0], 1, MPI_INT, MASTER, FROM_MASTER, MPI_COMM_WORLD);
-				MPI_Send(&referencia[index][1], 1, MPI_DOUBLE, MASTER, FROM_MASTER, MPI_COMM_WORLD);
-                //printf("recvRows(task=%d) index=%d result=%d\n", taskId,index,result);
+                MPI_Send(&referencia[index][0], 1, MPI_DOUBLE, MASTER, FROM_MASTER, MPI_COMM_WORLD);
+				MPI_Send(&referencia[index][1], 1, MPI_DOUBLE, MASTER, FROM_MASTER, MPI_COMM_WORLD);				
+                //printf("enviados los resultados (task=%d) index=%d ind=%f match=%f\n\n", taskId,index, referencia[index][0], referencia[index][1]);
         }
   }
 }
@@ -185,7 +186,7 @@ void DoSequencial()
 				match = temp;
 			}
 		}
-		printf("%i %i %f \n",i, ind, match);
+		//printf("%i %i %f \n",i, ind, match);
 		referencia[i][0] = (double)ind;
 		referencia[i][1] = (double)match;
 	}
@@ -208,9 +209,9 @@ void recvResults() {
         //printf("recvResults(%d) waiting data from %d\n", taskId,w);
     MPI_Recv(&index, 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD, &status);
         if (index != -1) {
-                MPI_Recv(&referencia[index][0], 1, MPI_INT, w, FROM_MASTER, MPI_COMM_WORLD,&status);
+                MPI_Recv(&referencia[index][0], 1, MPI_DOUBLE, w, FROM_MASTER, MPI_COMM_WORLD,&status);
 				MPI_Recv(&referencia[index][1], 1, MPI_DOUBLE, w, FROM_MASTER, MPI_COMM_WORLD,&status);
-              //  printf("recvResults(%d) index=%d row-sum=%d\n", taskId,index,vec_sum[index]);
+                //printf("recvResults(%d) index=%d ind=%f match=%f\n", taskId,index,referencia[index][0], referencia[index][1]);
         }
   }
 }
@@ -221,7 +222,7 @@ void fillMatrix() {
 				//val_i = rand()%256;
 				val_j = rand()%256;
 				Fi[j] = val_j;
-				Fj[j] = val_j;
+				Fj[j] = val_j + rand()%50;//((rand()%1)*100-50);
 		}
 		
  }
@@ -246,20 +247,27 @@ void fillMatrix() {
  void main(int argc, char **argv) {
         initMPI(argc, argv);
 		
-		/*fillMatrix();
-		imprimirMatrices();
-		DoSequencial();
-		imprimirReferencias();*/
-		
+		/*
+		start = MPI_Wtime();
+		if (taskId == MASTER) 
+		{
+			fillMatrix();
+			//imprimirMatrices();
+			DoSequencial();
+			//imprimirReferencias();
+			printf("Tiempo de procesamiento secuencial: %lf\n", MPI_Wtime()-start);
+        }
+		*/
+
 		
         start = MPI_Wtime();
         if (taskId == MASTER) {
                 fillMatrix();
-				imprimirMatrices();
+				//imprimirMatrices();
                 sendRows();
                 recvResults();
-                printf("Processing time: %lf\n", MPI_Wtime()-start);
-				imprimirReferencias();
+				//imprimirReferencias();
+                printf("Tiempo de procesamiento paralelo: %lf\n", MPI_Wtime()-start);
         } else {
                 recvRows();
         }
