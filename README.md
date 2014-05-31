@@ -1,0 +1,1 @@
+Este programa consiste en la realizacion de un algoritmo paralelo en c con mpi, para resolver el problema de los vectores de movimiento usado en la compresion mpeg.
