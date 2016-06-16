@@ -1,14 +1,14 @@
 
-all: vectoresMov run
+all: vectoresMov
 
 vectoresMov: vectoresMov.c
 	mpicc $< -o $@
 	
 runsec:
-	mpirun -np 1 vectoresMov
+	mpirun -np 2 vectoresMov
 
 run:
-	mpirun -np 4 vectoresMov
+	mpirun -np 4 vectoresMov > result.txt
 
 clean:
 	rm  -f vectoresMov.o vectoresMov

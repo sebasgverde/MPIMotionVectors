@@ -16,8 +16,8 @@
 #define FROM_MASTER 1
 #define FROM_WORKER 2
 
-#define TAMANIO 10000
-#define TAMMACROBLOQUE 100
+#define TAMANIO 100
+#define TAMMACROBLOQUE 10
 
  #define F_x 640
  #define F_y 480
@@ -263,10 +263,10 @@ void fillMatrix() {
         start = MPI_Wtime();
         if (taskId == MASTER) {
                 fillMatrix();
-				//imprimirMatrices();
+				imprimirMatrices();
                 sendRows();
                 recvResults();
-				//imprimirReferencias();
+				imprimirReferencias();
                 printf("Tiempo de procesamiento paralelo: %lf\n", MPI_Wtime()-start);
         } else {
                 recvRows();
